@@ -1,3 +1,0 @@
-(executable
- (public_name 01)
- (name main))

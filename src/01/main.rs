@@ -1,5 +1,5 @@
 use regex::Regex;
-use std::{fs::read_to_string, iter::zip};
+use std::{collections::HashMap, fs::read_to_string, iter::zip};
 
 type Input = (Vec<u32>, Vec<u32>);
 
@@ -28,7 +28,7 @@ fn parse_input(file: &str) -> Input {
 
 struct Result {
     difference: u32,
-    similarity: usize,
+    similarity: u32,
 }
 
 fn solve(mut input: Input) -> Result {
@@ -39,42 +39,22 @@ fn solve(mut input: Input) -> Result {
         .map(|(left, right)| left.abs_diff(*right))
         .sum();
 
-    let mut right_iter = input.1.into_iter();
-    let mut right_num = right_iter.next().unwrap();
-    let similarity: usize = input
+    let counts = input
+        .1
+        .iter()
+        .fold(HashMap::<u32, u32>::new(), |mut counts, value| {
+            match counts.get(value) {
+                Some(count) => counts.insert(*value, count + 1),
+                None => counts.insert(*value, 1),
+            };
+
+            counts
+        });
+
+    let similarity = input
         .0
-        .into_iter()
-        .map(|left_num| {
-            if left_num < right_num {
-                return 0;
-            }
-
-            if left_num > right_num {
-                right_num = match right_iter.find(|right| left_num <= *right) {
-                    None => return 0,
-                    Some(right) => {
-                        if right > left_num {
-                            return 0;
-                        }
-
-                        right
-                    }
-                };
-            }
-
-
-            let mut tmp_right_iter = right_iter.clone();
-
-            let len_before = tmp_right_iter.len();
-
-            match tmp_right_iter.find(|right| *right != left_num) {
-                None => 0,
-                Some(_) => {
-                    let len_after = tmp_right_iter.len();
-                    (len_before - len_after) * (left_num as usize)
-                }
-            }
-        })
+        .iter()
+        .map(|value| value * counts.get(value).unwrap_or(&0))
         .sum();
 
     Result {
@@ -95,19 +75,4 @@ fn main() {
             file, result.difference, result.similarity
         )
     }
-}
-
-#[test]
-fn test() {
-    let a = [1, 2, 3, 4];
-
-    let mut iter = a.iter();
-
-    assert_eq!(
-        iter.position(|&x| {
-            println!("{}", x);
-            x >= 2
-        }),
-        Some(1)
-    );
 }

@@ -8,7 +8,7 @@ pub trait ProblemSolver<TProblem, TResult: Display> {
     fn solve(&mut self, input: TProblem) -> TResult;
 }
 
-pub struct Runner<'a, 'b, TProblem, TResult: Display> {
+pub struct Runner<'a, 'b, TProblem, TResult> {
     input_files: Vec<&'a str>,
 
     // TODO find a way to remove the dynamic dispatch

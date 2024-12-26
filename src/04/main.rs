@@ -15,20 +15,19 @@ impl InputParser<Input> for Parser {
 
 type Vector = (i32, i32);
 
-const UP: Vector = (0, -1);
 const UP_RIGHT: Vector = (1, -1);
-const RIGHT: Vector = (1, 0);
 const DOWN_RIGHT: Vector = (1, 1);
-const DOWN: Vector = (0, 1);
 const DOWN_LEFT: Vector = (-1, 1);
-const LEFT: Vector = (-1, 0);
 const UP_LEFT: Vector = (-1, -1);
 
-const DIRECTIONS: [Vector; 8] = [
-    UP, UP_RIGHT, RIGHT, DOWN_RIGHT, DOWN, DOWN_LEFT, LEFT, UP_LEFT,
+const POSSIBLE_DIRECTIONS: [[Vector; 2]; 4] = [
+    [DOWN_RIGHT, DOWN_LEFT],
+    [DOWN_LEFT, UP_LEFT],
+    [UP_LEFT, UP_RIGHT],
+    [UP_RIGHT, DOWN_RIGHT],
 ];
 
-const SEARCH_STR: &str = "XMAS";
+const SEARCH_STR: &str = "MAS";
 
 type Coord = (usize, usize);
 
@@ -80,11 +79,20 @@ impl ProblemSolver<Input, Result> for Solver {
             .flat_map(|(y, row)| (0..row.len()).map(move |x| (x, y)));
 
         coords
-            .map(|coord| -> u32 {
-                DIRECTIONS
+            .map(|(x, y)| -> u32 {
+                POSSIBLE_DIRECTIONS
                     .iter()
-                    .map(|direction| {
-                        input.search_in_direction(*direction, SEARCH_STR.chars(), coord) as u32
+                    .map(|directions| {
+                        directions.iter().all(|direction| {
+                            let (dir_x, dir_y) = direction;
+
+                            let start_coord: Coord = (
+                                x.wrapping_add_signed(-dir_x as isize),
+                                y.wrapping_add_signed(-dir_y as isize),
+                            );
+
+                            input.search_in_direction(*direction, SEARCH_STR.chars(), start_coord)
+                        }) as u32
                     })
                     .sum()
             })

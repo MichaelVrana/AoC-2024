@@ -6,7 +6,7 @@ type Input = Vec<Vec<i32>>;
 struct Parser;
 
 impl InputParser<Input> for Parser {
-    fn parse(&mut self, filename: &str) -> Input {
+    fn parse(&self, filename: &str) -> Input {
         let file = read_to_string(filename).unwrap();
 
         file.lines()
@@ -48,7 +48,7 @@ fn validate_sequence<T: Iterator<Item = i32>>(mut iter: T) -> LineResult {
 }
 
 impl ProblemSolver<Input, Result> for Solver {
-    fn solve(&mut self, input: Input) -> Result {
+    fn solve(&self, input: Input) -> Result {
         input
             .iter()
             .map(|sequence| {
@@ -80,15 +80,10 @@ impl ProblemSolver<Input, Result> for Solver {
 }
 
 fn main() {
-    Runner::new(
-        &mut Parser,
-        &mut Solver,
-        vec![
-            "src/02/input_1.txt",
-            "src/02/input_2.txt",
-            "src/02/input_3.txt",
-            "src/02/input_4.txt",
-        ],
-    )
-    .run();
+    Runner::new(Parser, Solver).run(&vec![
+        "src/02/input_1.txt",
+        "src/02/input_2.txt",
+        "src/02/input_3.txt",
+        "src/02/input_4.txt",
+    ]);
 }

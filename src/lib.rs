@@ -1,36 +1,45 @@
-use std::fmt::Display;
+use std::{fmt::Display, marker::PhantomData};
 
 pub trait InputParser<TProblem> {
-    fn parse(&mut self, filename: &str) -> TProblem;
+    fn parse(&self, filename: &str) -> TProblem;
 }
 
 pub trait ProblemSolver<TProblem, TResult: Display> {
-    fn solve(&mut self, input: TProblem) -> TResult;
+    fn solve(&self, input: TProblem) -> TResult;
 }
 
-pub struct Runner<'a, 'b, TProblem, TResult> {
-    input_files: Vec<&'a str>,
+pub struct Runner<TProblem, TResult, TInputParser, TProblemSolver>
+where
+    TResult: Display,
+    TInputParser: InputParser<TProblem>,
+    TProblemSolver: ProblemSolver<TProblem, TResult>,
+{
+    parser: TInputParser,
+    solver: TProblemSolver,
 
-    // TODO find a way to remove the dynamic dispatch
-    parser: &'a mut dyn InputParser<TProblem>,
-    solver: &'b mut dyn ProblemSolver<TProblem, TResult>,
+    phantom_problem: PhantomData<TProblem>,
+    phantom_result: PhantomData<TResult>,
 }
 
-impl<'a, 'b, TProblem, TResult: Display> Runner<'a, 'b, TProblem, TResult> {
-    pub fn new(
-        parser: &'a mut dyn InputParser<TProblem>,
-        solver: &'b mut dyn ProblemSolver<TProblem, TResult>,
-        input_files: Vec<&'a str>,
-    ) -> Self {
+impl<TProblem, TResult, TInputParser, TProblemSolver>
+    Runner<TProblem, TResult, TInputParser, TProblemSolver>
+where
+    TResult: Display,
+    TInputParser: InputParser<TProblem>,
+    TProblemSolver: ProblemSolver<TProblem, TResult>,
+{
+    pub fn new(parser: TInputParser, solver: TProblemSolver) -> Self {
         Runner {
-            input_files,
             parser,
             solver,
+
+            phantom_problem: PhantomData,
+            phantom_result: PhantomData,
         }
     }
 
-    pub fn run(&mut self) {
-        for filename in self.input_files.iter() {
+    pub fn run(&self, input_files: &Vec<&'_ str>) {
+        for filename in input_files.iter() {
             let input = self.parser.parse(filename);
             let result = self.solver.solve(input);
 

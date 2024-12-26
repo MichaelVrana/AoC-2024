@@ -6,7 +6,7 @@ type Input = Vec<Vec<char>>;
 struct Parser;
 
 impl InputParser<Input> for Parser {
-    fn parse(&mut self, filename: &str) -> Input {
+    fn parse(&self, filename: &str) -> Input {
         let file = read_to_string(filename).unwrap();
 
         file.lines().map(|line| line.chars().collect()).collect()
@@ -72,7 +72,7 @@ type Result = u32;
 struct Solver;
 
 impl ProblemSolver<Input, Result> for Solver {
-    fn solve(&mut self, input: Input) -> Result {
+    fn solve(&self, input: Input) -> Result {
         let coords = input
             .iter()
             .enumerate()
@@ -101,10 +101,5 @@ impl ProblemSolver<Input, Result> for Solver {
 }
 
 fn main() {
-    Runner::new(
-        &mut Parser,
-        &mut Solver,
-        vec!["src/04/input_1.txt", "src/04/input_2.txt"],
-    )
-    .run();
+    Runner::new(Parser, Solver).run(&vec!["src/04/input_1.txt", "src/04/input_2.txt"]);
 }

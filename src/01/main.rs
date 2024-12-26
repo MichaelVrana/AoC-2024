@@ -14,7 +14,7 @@ fn read_lines(filename: &str) -> Vec<String> {
 }
 
 impl InputParser<Input> for Parser {
-    fn parse(&mut self, filename: &str) -> Input {
+    fn parse(&self, filename: &str) -> Input {
         let regex = Regex::new(r"^([0-9]+)\s+([0-9]+)$").unwrap();
 
         let mut left_vec = Vec::<u32>::new();
@@ -49,7 +49,7 @@ impl Display for Result {
 struct Solver;
 
 impl ProblemSolver<Input, Result> for Solver {
-    fn solve(&mut self, mut input: Input) -> Result {
+    fn solve(&self, mut input: Input) -> Result {
         input.0.sort();
         input.1.sort();
 
@@ -83,10 +83,5 @@ impl ProblemSolver<Input, Result> for Solver {
 }
 
 fn main() {
-    Runner::new(
-        &mut Parser,
-        &mut Solver,
-        vec!["src/01/input_1.txt", "src/01/input_2.txt"],
-    )
-    .run();
+    Runner::new(Parser, Solver).run(&vec!["src/01/input_1.txt", "src/01/input_2.txt"]);
 }

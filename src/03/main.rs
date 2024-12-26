@@ -13,7 +13,7 @@ type Input = Vec<Instruction>;
 struct Parser;
 
 impl InputParser<Input> for Parser {
-    fn parse(&mut self, filename: &str) -> Input {
+    fn parse(&self, filename: &str) -> Input {
         let file = read_to_string(filename).unwrap();
 
         let regex = Regex::new(
@@ -89,7 +89,7 @@ impl Interpreter {
 struct Solver;
 
 impl ProblemSolver<Input, Result> for Solver {
-    fn solve(&mut self, input: Input) -> Result {
+    fn solve(&self, input: Input) -> Result {
         input
             .iter()
             .fold(Interpreter::new(), |interpreter, instr| match instr {
@@ -102,14 +102,9 @@ impl ProblemSolver<Input, Result> for Solver {
 }
 
 fn main() {
-    Runner::new(
-        &mut Parser,
-        &mut Solver,
-        vec![
-            "src/03/input_1.txt",
-            "src/03/input_2.txt",
-            "src/03/input_3.txt",
-        ],
-    )
-    .run();
+    Runner::new(Parser, Solver).run(&vec![
+        "src/03/input_1.txt",
+        "src/03/input_2.txt",
+        "src/03/input_3.txt",
+    ]);
 }

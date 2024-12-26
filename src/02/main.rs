@@ -55,8 +55,20 @@ impl ProblemSolver<Input, Result> for Solver {
                 for invert_coef in [-1, 1] {
                     let iter = sequence.iter().map(|value| value * invert_coef);
 
-                    match validate_sequence(iter) {
-                        LineResult::Invalid { index: _ } => continue,
+                    match validate_sequence(iter.clone()) {
+                        LineResult::Invalid { index } => {
+                            for index_to_remove in [index, index + 1] {
+                                let head = iter.clone().take(index_to_remove);
+                                let tail = iter.clone().skip(index_to_remove + 1);
+
+                                let repaired_sequence = head.chain(tail);
+
+                                match validate_sequence(repaired_sequence) {
+                                    LineResult::Invalid { index: _ } => continue,
+                                    LineResult::Valid => return 1,
+                                }
+                            }
+                        }
                         LineResult::Valid => return 1,
                     }
                 }
@@ -71,7 +83,12 @@ fn main() {
     Runner::new(
         &mut Parser,
         &mut Solver,
-        vec!["src/02/input_1.txt", "src/02/input_2.txt", "src/02/input_3.txt"],
+        vec![
+            "src/02/input_1.txt",
+            "src/02/input_2.txt",
+            "src/02/input_3.txt",
+            "src/02/input_4.txt",
+        ],
     )
     .run();
 }

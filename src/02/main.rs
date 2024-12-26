@@ -23,36 +23,45 @@ type Result = u32;
 
 struct Solver;
 
-const INVALID: u32 = 0;
-const VALID: u32 = 1;
+enum LineResult {
+    Valid,
+    Invalid { index: usize },
+}
+
+fn validate_sequence<T: Iterator<Item = i32>>(mut iter: T) -> LineResult {
+    let mut prev = iter.next().unwrap();
+
+    let mut index = 0;
+
+    for value in iter {
+        let difference = value - prev;
+
+        if difference < 1 || difference > 3 {
+            return LineResult::Invalid { index };
+        }
+
+        prev = value;
+        index = index + 1;
+    }
+
+    LineResult::Valid
+}
 
 impl ProblemSolver<Input, Result> for Solver {
     fn solve(&mut self, input: Input) -> Result {
         input
             .iter()
-            .map(|sequence| match (sequence.get(0), sequence.get(1)) {
-                (Some(first), Some(second)) => {
-                    let descending = *first > *second;
+            .map(|sequence| {
+                for invert_coef in [-1, 1] {
+                    let iter = sequence.iter().map(|value| value * invert_coef);
 
-                    let invert_coef = if descending { -1 } else { 1 };
-
-                    let iter = sequence.iter().skip(1).map(|value| value * invert_coef);
-
-                    let mut prev = first * invert_coef;
-
-                    for value in iter {
-                        let difference = value - prev;
-
-                        if difference < 1 || difference > 3 {
-                            return INVALID;
-                        }
-
-                        prev = value;
+                    match validate_sequence(iter) {
+                        LineResult::Invalid { index: _ } => continue,
+                        LineResult::Valid => return 1,
                     }
-
-                    VALID
                 }
-                _ => INVALID,
+
+                0
             })
             .sum()
     }
@@ -62,7 +71,7 @@ fn main() {
     Runner::new(
         &mut Parser,
         &mut Solver,
-        vec!["src/02/input_1.txt", "src/02/input_2.txt"],
+        vec!["src/02/input_1.txt", "src/02/input_2.txt", "src/02/input_3.txt"],
     )
     .run();
 }

@@ -14,32 +14,28 @@ struct Input {
     updates: Updates,
 }
 
-type Dependencies = HashMap<u32, HashSet<u32>>;
+type Page = u32;
 
-fn add_transitive_deps(deps: Dependencies) -> Dependencies {
-    deps.
-}
+type DependencyMap = HashMap<Page, HashSet<Page>>;
 
 impl Input {
-    fn get_deps(&self) {
-        let deps =
-            self.deps
-                .iter()
-                .fold(Dependencies::new(), |mut deps, (depends_on, dependant)| {
-                    match deps.get_mut(dependant) {
-                        None => {
-                            let mut value_deps = HashSet::new();
-                            deps.insert(*dependant, value_deps);
-                        }
-                        Some(value_deps) => {
-                            value_deps.insert(*depends_on);
-                        }
+    fn get_dependency_map(&self) -> DependencyMap {
+        self.deps
+            .iter()
+            .fold(DependencyMap::new(), |mut deps, (depends_on, dependant)| {
+                match deps.get_mut(dependant) {
+                    None => {
+                        let mut value_deps = HashSet::new();
+                        value_deps.insert(*depends_on);
+                        deps.insert(*dependant, value_deps);
                     }
+                    Some(value_deps) => {
+                        value_deps.insert(*depends_on);
+                    }
+                }
 
-                    deps
-                });
-
-        add_transitive_deps(deps)
+                deps
+            })
     }
 }
 
@@ -79,27 +75,65 @@ type Result = u32;
 
 struct Solver;
 
+fn check_dependencies_rec(
+    dependency_map: &DependencyMap,
+    pages_to_update: &HashSet<u32>,
+    updated: &HashSet<u32>,
+    page_deps: &HashSet<Page>,
+) -> bool {
+    page_deps.intersection(pages_to_update).all(|page_dep| {
+        if !updated.contains(page_dep) {
+            return false;
+        }
+
+        match dependency_map.get(page_dep) {
+            Some(child_deps) => {
+                check_dependencies_rec(dependency_map, pages_to_update, updated, child_deps)
+            }
+            None => true,
+        }
+    })
+}
+
 impl ProblemSolver<Input, Result> for Solver {
     fn solve(&self, input: Input) -> Result {
-        let deps = input.deps.iter().fold(
-            HashMap::<u32, HashSet<u32>>::new(),
-            |mut deps, (depends_on, dependant)| {
-                match deps.get_mut(dependant) {
-                    None => {
-                        let mut value_deps = HashSet::new();
-                        deps.insert(*dependant, value_deps);
-                    }
-                    Some(value_deps) => {
-                        value_deps.insert(*depends_on);
-                    }
-                }
+        let dependency_map = input.get_dependency_map();
 
-                deps
-            },
-        );
+        input
+            .updates
+            .iter()
+            .map(|update| {
+                let pages_to_update: HashSet<Page> = update.iter().map(|page| *page).collect();
+                let mut updated = HashSet::<Page>::new();
+
+                let constraints_satisfied = update.iter().all(|page_in_update| {
+                    let result = match dependency_map.get(page_in_update) {
+                        Some(page_deps) => check_dependencies_rec(
+                            &dependency_map,
+                            &pages_to_update,
+                            &updated,
+                            page_deps,
+                        ),
+                        None => true,
+                    };
+
+                    updated.insert(*page_in_update);
+
+                    result
+                });
+
+                if constraints_satisfied {
+                    let result = *update.get(update.len() / 2).unwrap();
+
+                    result
+                } else {
+                    0
+                }
+            })
+            .sum()
     }
 }
 
 fn main() {
-    Runner::new(Parser, Solver).run(&vec!["src/05/input_1.txt"]);
+    Runner::new(Parser, Solver).run(&vec!["src/05/input_1.txt", "src/05/input_2.txt"]);
 }

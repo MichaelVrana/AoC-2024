@@ -73,6 +73,48 @@ impl InputParser<Input> for Parser {
 
 type Result = u32;
 
+struct TopSorter<'a, 'b> {
+    dependency_map: &'a DependencyMap,
+    pages_in_update: &'b HashSet<Page>,
+    topological_order: Vec<Page>,
+}
+
+impl<'a, 'b> TopSorter<'a, 'b> {
+    fn new(dependency_map: &'a DependencyMap, pages_in_update: &'b HashSet<Page>) -> Self {
+        Self {
+            dependency_map,
+            pages_in_update,
+            topological_order: Vec::new(),
+        }
+    }
+
+    fn top_sort(mut self) -> Vec<Page> {
+        for page_in_update in self.pages_in_update {
+            self.visit(*page_in_update);
+
+            if self.pages_in_update.len() == self.topological_order.len() {
+                break;
+            }
+        }
+
+        self.topological_order
+    }
+
+    fn visit(&mut self, page: Page) {
+        if self.topological_order.contains(&page) {
+            return;
+        }
+
+        if let Some(page_deps) = self.dependency_map.get(&page) {
+            for page_dep in page_deps.intersection(&self.pages_in_update) {
+                self.visit(*page_dep);
+            }
+        }
+
+        self.topological_order.push(page);
+    }
+}
+
 struct Solver;
 
 impl ProblemSolver<Input, Result> for Solver {
@@ -100,10 +142,9 @@ impl ProblemSolver<Input, Result> for Solver {
                     deps_printed
                 });
 
-                if constraints_satisfied {
-                    let result = *update.get(update.len() / 2).unwrap();
-
-                    result
+                if !constraints_satisfied {
+                    let fixed_update = TopSorter::new(&dependency_map, &pages_in_update).top_sort();
+                    *fixed_update.get(fixed_update.len() / 2).unwrap()
                 } else {
                     0
                 }

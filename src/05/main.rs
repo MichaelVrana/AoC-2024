@@ -75,71 +75,29 @@ type Result = u32;
 
 struct Solver;
 
-struct DependencyChecker<'a, 'b> {
-    dependency_map: &'a DependencyMap,
-    pages_in_update: &'b HashSet<u32>,
-    results: HashMap<Page, bool>,
-}
-
-impl<'a, 'b> DependencyChecker<'a, 'b> {
-    fn new(dependency_map: &'a DependencyMap, pages_in_update: &'b HashSet<u32>) -> Self {
-        Self {
-            dependency_map,
-            pages_in_update,
-            results: HashMap::new(),
-        }
-    }
-
-    fn check_dependencies_rec(
-        &mut self,
-        updated: &HashSet<u32>,
-        page_deps: &HashSet<Page>,
-    ) -> bool {
-        page_deps
-            .intersection(&self.pages_in_update)
-            .all(|page_dep| {
-                if !updated.contains(&page_dep) {
-                    return false;
-                }
-
-                if let Some(result) = self.results.get(page_dep) {
-                    return *result;
-                }
-
-                let result = match self.dependency_map.get(&page_dep) {
-                    Some(child_deps) => self.check_dependencies_rec(updated, child_deps),
-                    None => true,
-                };
-
-                self.results.insert(*page_dep, result);
-
-                result
-            })
-    }
-}
-
 impl ProblemSolver<Input, Result> for Solver {
     fn solve(&self, input: Input) -> Result {
         let dependency_map = input.get_dependency_map();
+        let empty_set = HashSet::new();
 
         input
             .updates
             .iter()
             .map(|update| {
                 let pages_in_update: HashSet<Page> = update.iter().map(|page| *page).collect();
-                let mut deps_checker = DependencyChecker::new(&dependency_map, &pages_in_update);
 
                 let mut updated = HashSet::<Page>::new();
 
                 let constraints_satisfied = update.iter().all(|page_in_update| {
-                    let result = match dependency_map.get(page_in_update) {
-                        Some(page_deps) => deps_checker.check_dependencies_rec(&updated, page_deps),
-                        None => true,
-                    };
+                    let deps = dependency_map.get(page_in_update).unwrap_or(&empty_set);
+
+                    let deps_printed = deps
+                        .intersection(&pages_in_update)
+                        .all(|page_dep| updated.contains(page_dep));
 
                     updated.insert(*page_in_update);
 
-                    result
+                    deps_printed
                 });
 
                 if constraints_satisfied {

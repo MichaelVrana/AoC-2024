@@ -75,24 +75,47 @@ type Result = u32;
 
 struct Solver;
 
-fn check_dependencies_rec(
-    dependency_map: &DependencyMap,
-    pages_to_update: &HashSet<u32>,
-    updated: &HashSet<u32>,
-    page_deps: &HashSet<Page>,
-) -> bool {
-    page_deps.intersection(pages_to_update).all(|page_dep| {
-        if !updated.contains(page_dep) {
-            return false;
-        }
+struct DependencyChecker<'a, 'b> {
+    dependency_map: &'a DependencyMap,
+    pages_in_update: &'b HashSet<u32>,
+    results: HashMap<Page, bool>,
+}
 
-        match dependency_map.get(page_dep) {
-            Some(child_deps) => {
-                check_dependencies_rec(dependency_map, pages_to_update, updated, child_deps)
-            }
-            None => true,
+impl<'a, 'b> DependencyChecker<'a, 'b> {
+    fn new(dependency_map: &'a DependencyMap, pages_in_update: &'b HashSet<u32>) -> Self {
+        Self {
+            dependency_map,
+            pages_in_update,
+            results: HashMap::new(),
         }
-    })
+    }
+
+    fn check_dependencies_rec(
+        &mut self,
+        updated: &HashSet<u32>,
+        page_deps: &HashSet<Page>,
+    ) -> bool {
+        page_deps
+            .intersection(&self.pages_in_update)
+            .all(|page_dep| {
+                if !updated.contains(&page_dep) {
+                    return false;
+                }
+
+                if let Some(result) = self.results.get(page_dep) {
+                    return *result;
+                }
+
+                let result = match self.dependency_map.get(&page_dep) {
+                    Some(child_deps) => self.check_dependencies_rec(updated, child_deps),
+                    None => true,
+                };
+
+                self.results.insert(*page_dep, result);
+
+                result
+            })
+    }
 }
 
 impl ProblemSolver<Input, Result> for Solver {
@@ -103,17 +126,14 @@ impl ProblemSolver<Input, Result> for Solver {
             .updates
             .iter()
             .map(|update| {
-                let pages_to_update: HashSet<Page> = update.iter().map(|page| *page).collect();
+                let pages_in_update: HashSet<Page> = update.iter().map(|page| *page).collect();
+                let mut deps_checker = DependencyChecker::new(&dependency_map, &pages_in_update);
+
                 let mut updated = HashSet::<Page>::new();
 
                 let constraints_satisfied = update.iter().all(|page_in_update| {
                     let result = match dependency_map.get(page_in_update) {
-                        Some(page_deps) => check_dependencies_rec(
-                            &dependency_map,
-                            &pages_to_update,
-                            &updated,
-                            page_deps,
-                        ),
+                        Some(page_deps) => deps_checker.check_dependencies_rec(&updated, page_deps),
                         None => true,
                     };
 
@@ -135,5 +155,10 @@ impl ProblemSolver<Input, Result> for Solver {
 }
 
 fn main() {
-    Runner::new(Parser, Solver).run(&vec!["src/05/input_1.txt", "src/05/input_2.txt"]);
+    Runner::new(Parser, Solver).run(&vec![
+        "src/05/input_1.txt",
+        "src/05/input_2.txt",
+        "src/05/input_3.txt",
+        "src/05/input_4.txt",
+    ]);
 }

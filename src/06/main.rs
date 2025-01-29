@@ -1,16 +1,13 @@
 use aoc_2024::{InputParser, ProblemSolver, Runner};
-use std::{
-    collections::BTreeSet,
-    fs::read_to_string,
-    hash::{DefaultHasher, Hash, Hasher},
-};
+use std::{collections::HashMap, fs::read_to_string, hash::Hash};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum Tile {
     Space,
     Obstacle,
 }
 
+#[derive(Clone)]
 struct Map {
     // one could just use a Vec<Vec<Tile>> but this saves space!
     // and also is contiguos
@@ -20,36 +17,62 @@ struct Map {
 }
 
 impl Map {
+    fn tile_idx(&self, position: &Position) -> usize {
+        position.x + self.y_len * position.y
+    }
+
     fn get_tile(&self, position: &Position) -> Tile {
-        *self
-            .tiles
-            .get(position.x + self.y_len * position.y)
-            .unwrap()
+        *self.tiles.get(self.tile_idx(position)).unwrap()
     }
 
     fn is_within_bounds(&self, position: &Position) -> bool {
         position.x < self.x_len && position.y < self.y_len
     }
+
+    fn intersects_obstacle(&self, from: Position, dir: Vector) -> bool {
+        let mut curr_pos = from;
+
+        while self.is_within_bounds(&curr_pos) {
+            if self.get_tile(&curr_pos) == Tile::Obstacle {
+                return true;
+            }
+
+            curr_pos = curr_pos.move_in_dir(dir);
+        }
+
+        false
+    }
+
+    fn replace_tile(&self, at: &Position, tile: Tile) -> Map {
+        let mut new_map = self.clone();
+
+        let mut tile_ref = new_map.tiles.get_mut(self.tile_idx(at)).unwrap();
+
+        *tile_ref = tile;
+
+        new_map
+    }
 }
 
-#[derive(Hash, PartialEq, Eq, Clone)]
+#[derive(Hash, PartialEq, Eq, PartialOrd, Ord, Clone)]
 struct Position {
     x: usize,
     y: usize,
 }
 
 impl Position {
-    fn move_in_dir(&self, dir: &Vector) -> Position {
+    fn move_in_dir(&self, dir: Vector) -> Position {
         Position {
-            x: self.x.wrapping_add_signed(dir.x),
-            y: self.y.wrapping_add_signed(dir.y),
+            x: self.x.wrapping_add_signed(dir.x as isize),
+            y: self.y.wrapping_add_signed(dir.y as isize),
         }
     }
 }
 
+#[derive(PartialEq, Eq, Clone, Copy)]
 struct Vector {
-    x: isize,
-    y: isize,
+    x: i8,
+    y: i8,
 }
 
 impl Vector {
@@ -115,21 +138,25 @@ type Output = usize;
 
 impl ProblemSolver<Input, Output> for Solver {
     fn solve(&self, input: Input) -> Output {
-        let mut pos = input.starting_pos;
+        let mut pos = input.starting_pos.clone();
         let mut dir = UP;
 
-        // hashes are just u64, thus they are half the size of positions
-        // you could just do this simply with a HashSet, but i thought this was more fun
-        let mut visited_pos_hashes = BTreeSet::<u64>::new();
+        let mut visited_pos_with_dirs = HashMap::<Position, Vec<Vector>>::new();
 
         loop {
-            let mut hasher = DefaultHasher::new();
+            match visited_pos_with_dirs.get_mut(&pos) {
+                Some(dirs) => {
+                    if !dirs.contains(&dir) {
+                        dirs.push(dir.clone());
+                    }
+                }
+                None => {
+                    let dirs = vec![dir.clone()];
+                    visited_pos_with_dirs.insert(pos.clone(), dirs);
+                }
+            }
 
-            pos.hash(&mut hasher);
-
-            visited_pos_hashes.insert(hasher.finish());
-
-            let next_pos = pos.move_in_dir(&dir);
+            let next_pos = pos.move_in_dir(dir);
 
             if !input.map.is_within_bounds(&next_pos) {
                 break;
@@ -141,7 +168,64 @@ impl ProblemSolver<Input, Output> for Solver {
             }
         }
 
-        visited_pos_hashes.len()
+        let mut possible_positions = visited_pos_with_dirs
+            .iter()
+            .flat_map(|(pos, dirs)| {
+                dirs.iter().filter_map(|dir| {
+                    let next_pos = pos.move_in_dir(*dir);
+
+                    if input.map.is_within_bounds(&next_pos)
+                        && input.map.get_tile(&next_pos) == Tile::Space
+                        && input
+                            .map
+                            .intersects_obstacle(pos.clone(), dir.rotate_right())
+                    {
+                        return Some(next_pos);
+                    }
+
+                    None
+                })
+            })
+            .collect::<Vec<Position>>();
+
+        possible_positions.sort();
+        possible_positions.dedup();
+
+        possible_positions.iter().filter(|pos| {
+            let map = input.map.replace_tile(pos, Tile::Obstacle);
+
+            let mut pos = input.starting_pos.clone();
+            let mut dir = UP;
+
+            let mut visited_pos_with_dirs = HashMap::<Position, Vec<Vector>>::new();
+
+            loop {
+                match visited_pos_with_dirs.get_mut(&pos) {
+                    Some(dirs) => {
+                        if dirs.contains(&dir) {
+                            return true;
+                        }
+
+                        dirs.push(dir);
+                    }
+                    None => {
+                        let dirs = vec![dir.clone()];
+                        visited_pos_with_dirs.insert(pos.clone(), dirs);
+                    }
+                }
+
+                let next_pos = pos.move_in_dir(dir);
+
+                if !map.is_within_bounds(&next_pos) {
+                    return false;
+                }
+
+                match map.get_tile(&next_pos) {
+                    Tile::Space => pos = next_pos,
+                    Tile::Obstacle => dir = dir.rotate_right(),
+                }
+            }
+        }).count()
     }
 }
 

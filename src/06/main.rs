@@ -46,7 +46,7 @@ impl Map {
     fn replace_tile(&self, at: &Position, tile: Tile) -> Map {
         let mut new_map = self.clone();
 
-        let mut tile_ref = new_map.tiles.get_mut(self.tile_idx(at)).unwrap();
+        let tile_ref = new_map.tiles.get_mut(self.tile_idx(at)).unwrap();
 
         *tile_ref = tile;
 
@@ -132,43 +132,66 @@ impl InputParser<Input> for Parser {
     }
 }
 
+enum RunEndReason {
+    OutOfBounds,
+    Cycle,
+}
+
+struct RunResult {
+    end_reason: RunEndReason,
+    visited_pos_with_dirs: HashMap<Position, Vec<Vector>>,
+}
+
+fn run(map: &Map, starting_pos: &Position) -> RunResult {
+    let mut pos = starting_pos.clone();
+    let mut dir = UP;
+
+    let mut visited_pos_with_dirs = HashMap::<Position, Vec<Vector>>::new();
+
+    loop {
+        match visited_pos_with_dirs.get_mut(&pos) {
+            Some(dirs) => {
+                if dirs.contains(&dir) {
+                    return RunResult {
+                        end_reason: RunEndReason::Cycle,
+                        visited_pos_with_dirs,
+                    };
+                }
+
+                dirs.push(dir);
+            }
+            None => {
+                let dirs = vec![dir.clone()];
+                visited_pos_with_dirs.insert(pos.clone(), dirs);
+            }
+        }
+
+        let next_pos = pos.move_in_dir(dir);
+
+        if !map.is_within_bounds(&next_pos) {
+            return RunResult {
+                end_reason: RunEndReason::OutOfBounds,
+                visited_pos_with_dirs,
+            };
+        }
+
+        match map.get_tile(&next_pos) {
+            Tile::Space => pos = next_pos,
+            Tile::Obstacle => dir = dir.rotate_right(),
+        }
+    }
+}
+
 struct Solver;
 
 type Output = usize;
 
 impl ProblemSolver<Input, Output> for Solver {
     fn solve(&self, input: Input) -> Output {
-        let mut pos = input.starting_pos.clone();
-        let mut dir = UP;
+        let run_without_obstacle = run(&input.map, &input.starting_pos);
 
-        let mut visited_pos_with_dirs = HashMap::<Position, Vec<Vector>>::new();
-
-        loop {
-            match visited_pos_with_dirs.get_mut(&pos) {
-                Some(dirs) => {
-                    if !dirs.contains(&dir) {
-                        dirs.push(dir.clone());
-                    }
-                }
-                None => {
-                    let dirs = vec![dir.clone()];
-                    visited_pos_with_dirs.insert(pos.clone(), dirs);
-                }
-            }
-
-            let next_pos = pos.move_in_dir(dir);
-
-            if !input.map.is_within_bounds(&next_pos) {
-                break;
-            }
-
-            match input.map.get_tile(&next_pos) {
-                Tile::Space => pos = next_pos,
-                Tile::Obstacle => dir = dir.rotate_right(),
-            }
-        }
-
-        let mut possible_positions = visited_pos_with_dirs
+        let mut possible_positions = run_without_obstacle
+            .visited_pos_with_dirs
             .iter()
             .flat_map(|(pos, dirs)| {
                 dirs.iter().filter_map(|dir| {
@@ -191,41 +214,17 @@ impl ProblemSolver<Input, Output> for Solver {
         possible_positions.sort();
         possible_positions.dedup();
 
-        possible_positions.iter().filter(|pos| {
-            let map = input.map.replace_tile(pos, Tile::Obstacle);
+        possible_positions
+            .iter()
+            .filter(|pos| {
+                let map = input.map.replace_tile(pos, Tile::Obstacle);
 
-            let mut pos = input.starting_pos.clone();
-            let mut dir = UP;
-
-            let mut visited_pos_with_dirs = HashMap::<Position, Vec<Vector>>::new();
-
-            loop {
-                match visited_pos_with_dirs.get_mut(&pos) {
-                    Some(dirs) => {
-                        if dirs.contains(&dir) {
-                            return true;
-                        }
-
-                        dirs.push(dir);
-                    }
-                    None => {
-                        let dirs = vec![dir.clone()];
-                        visited_pos_with_dirs.insert(pos.clone(), dirs);
-                    }
+                match run(&map, &input.starting_pos).end_reason {
+                    RunEndReason::Cycle => true,
+                    _ => false
                 }
-
-                let next_pos = pos.move_in_dir(dir);
-
-                if !map.is_within_bounds(&next_pos) {
-                    return false;
-                }
-
-                match map.get_tile(&next_pos) {
-                    Tile::Space => pos = next_pos,
-                    Tile::Obstacle => dir = dir.rotate_right(),
-                }
-            }
-        }).count()
+            })
+            .count()
     }
 }
 

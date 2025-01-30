@@ -39,6 +39,17 @@ type Output = Int;
 
 struct Solver;
 
+fn glue(left: Int, right: Int) -> Int {
+    let right_digits = right.ilog10() + 1;
+
+    left * 10_u64.pow(right_digits) + right
+}
+
+#[test]
+fn test_glue() {
+    assert!(glue(12, 345) == 12345)
+}
+
 fn is_calculable<'a, TIter: Iterator<Item = &'a Int> + Clone>(
     acc: Int,
     result: Int,
@@ -46,9 +57,11 @@ fn is_calculable<'a, TIter: Iterator<Item = &'a Int> + Clone>(
 ) -> bool {
     match operands.next() {
         None => acc == result,
-        Some(operand) => [acc * operand, acc + operand].into_iter().any(|next_acc| {
-            next_acc <= result && is_calculable(next_acc, result, operands.clone())
-        }),
+        Some(operand) => [glue(acc, *operand), acc * operand, acc + operand]
+            .into_iter()
+            .any(|next_acc| {
+                next_acc <= result && is_calculable(next_acc, result, operands.clone())
+            }),
     }
 }
 

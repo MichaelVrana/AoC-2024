@@ -1,6 +1,20 @@
-use std::fs::read_to_string;
+use std::{collections::BTreeSet, fs::read_to_string, iter};
 
 use aoc_2024::{InputParser, ProblemSolver, Runner};
+
+fn gcd(a: isize, b: isize) -> isize {
+    if b == 0 {
+        return a;
+    }
+
+    gcd(b, a % b)
+}
+
+#[test]
+fn test_gcd() {
+    assert!(gcd(42, 56) == 14);
+    assert!(gcd(56, 42) == 14);
+}
 
 struct Vector {
     x: isize,
@@ -15,15 +29,13 @@ impl Vector {
         }
     }
 
-    fn div(&self, scalar: isize) -> Option<Vector> {
-        if self.x % scalar != 0 || self.y % scalar != 0 {
-            return None;
-        }
+    fn minimize(&self) -> Vector {
+        let gcd = gcd(self.x, self.y);
 
-        Some(Vector {
-            x: self.x / scalar,
-            y: self.y / scalar,
-        })
+        Vector {
+            x: self.x / gcd,
+            y: self.y / gcd,
+        }
     }
 }
 
@@ -107,7 +119,7 @@ struct Solver;
 
 impl ProblemSolver<Input, Output> for Solver {
     fn solve(&self, input: Input) -> Output {
-        let mut antinode_positions = (0..Frequency::MAX)
+        let antinode_positions = (0..Frequency::MAX)
             .flat_map(|frequency| {
                 let antena_positions = input.antenas.get(frequency as usize).unwrap();
 
@@ -119,34 +131,31 @@ impl ProblemSolver<Input, Output> for Solver {
                             .iter()
                             .skip(idx + 1)
                             .flat_map(|position_b| {
-                                let vector_to_b = position_a.vector_to(position_b);
+                                let vector_to_b = position_a.vector_to(position_b).minimize();
 
-                                let outward_antinodes = [
-                                    position_a.move_by(&vector_to_b.reverse()),
-                                    position_b.move_by(&vector_to_b),
-                                ]
-                                .into_iter()
-                                .filter(|antinode_pos| input.is_within_bounds(&antinode_pos));
+                                [vector_to_b.reverse(), vector_to_b].into_iter().flat_map(
+                                    |vector| {
+                                        let mut position = position_b.clone();
+                                        let input = &input; // shadow this behind a ref so we can move into the closure below
 
-                                let inward_antinodes = [
-                                    vector_to_b
-                                        .div(3)
-                                        .map(|one_third_to_b| position_a.move_by(&one_third_to_b)),
-                                    vector_to_b.div(3).map(|one_third_to_b| {
-                                        position_b.move_by(&one_third_to_b.reverse())
-                                    }),
-                                ]
-                                .into_iter()
-                                .filter_map(|val| val);
+                                        iter::from_fn(move || {
+                                            if !input.is_within_bounds(&position) {
+                                                return None;
+                                            }
 
-                                outward_antinodes.chain(inward_antinodes)
+                                            let result = Some(position.clone());
+
+                                            position = position.move_by(&vector);
+
+                                            return result;
+                                        })
+                                    },
+                                )
                             })
                     })
             })
-            .collect::<Vec<Position>>();
+            .collect::<BTreeSet<Position>>();
 
-        antinode_positions.sort();
-        antinode_positions.dedup();
         antinode_positions.len()
     }
 }

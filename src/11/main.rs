@@ -1,9 +1,10 @@
-use std::fs::read_to_string;
+use std::{collections::HashMap, fs::read_to_string};
 
 use aoc_2024::{InputParser, ProblemSolver, Runner};
 
 type StoneNumber = u64;
 
+#[derive(PartialEq, Eq, Clone, Copy, Hash)]
 struct Stone {
     number: StoneNumber,
 }
@@ -69,29 +70,49 @@ type Output = usize;
 
 struct Solver;
 
-const BLINK_COUNT: u8 = 25;
+type BlinkCount = u8;
 
-impl ProblemSolver<Input, Output> for Solver {
-    fn solve(&self, mut stones: Input) -> Output {
-        for _ in 0..BLINK_COUNT {
-            let mut new_stones: Input = Vec::new();
+const BLINK_COUNT: BlinkCount = 75;
 
-            new_stones.reserve(stones.len() * 2);
+#[derive(Default)]
+struct StoneBlinker {
+    results: HashMap<(StoneNumber, BlinkCount), Output>,
+}
 
-            stones = stones.iter().fold(new_stones, |mut acc, stone| {
-                let (new_stone, maybe_new_stone) = stone.blink();
-
-                acc.push(new_stone);
-
-                if let Some(second_new_stone) = maybe_new_stone {
-                    acc.push(second_new_stone);
-                }
-
-                acc
-            })
+impl StoneBlinker {
+    fn blink_at_stone(&mut self, stone: Stone, blink_count: BlinkCount) -> Output {
+        if let Some(result) = self.results.get(&(stone.number, blink_count)) {
+            return *result;
         }
 
-        stones.len()
+        if blink_count == 0 {
+            return 1;
+        }
+
+        let (new_stone, maybe_new_stone) = stone.blink();
+
+        let new_stone_count = self.blink_at_stone(new_stone, blink_count - 1);
+
+        let second_stone_count = maybe_new_stone
+            .map(|second_stone| self.blink_at_stone(second_stone, blink_count - 1))
+            .unwrap_or(0);
+
+        let result = new_stone_count + second_stone_count;
+
+        self.results.insert((stone.number, blink_count), result);
+
+        result
+    }
+}
+
+impl ProblemSolver<Input, Output> for Solver {
+    fn solve(&self, stones: Input) -> Output {
+        let mut stone_blinker = StoneBlinker::default();
+
+        stones
+            .into_iter()
+            .map(|stone| stone_blinker.blink_at_stone(stone, BLINK_COUNT))
+            .sum()
     }
 }
 

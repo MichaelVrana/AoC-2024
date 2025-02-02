@@ -30,7 +30,6 @@ path = "src/05/main.rs"
 name = "06"
 path = "src/06/main.rs"
 
-
 [[bin]]
 name = "07"
 path = "src/07/main.rs"
@@ -46,3 +45,7 @@ path = "src/09/main.rs"
 [[bin]]
 name = "10"
 path = "src/10/main.rs"
+
+[[bin]]
+name = "11"
+path = "src/11/main.rs"

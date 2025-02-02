@@ -1,4 +1,8 @@
-use std::{collections::HashSet, fs::read_to_string};
+use std::{
+    collections::BTreeSet,
+    fs::read_to_string,
+    hash::{DefaultHasher, Hash, Hasher},
+};
 
 use aoc_2024::{InputParser, ProblemSolver, Runner};
 
@@ -53,29 +57,31 @@ impl Map {
 
 type HikingScore = usize;
 
-struct HikeRouteScorer<'a> {
+struct HikeTrailScorer<'a> {
     map: &'a Map,
-    peaks: HashSet<Position>,
+    trail_hashes: BTreeSet<u64>,
 }
 
-impl<'a> HikeRouteScorer<'a> {
+impl<'a> HikeTrailScorer<'a> {
     fn new(map: &'a Map) -> Self {
         Self {
             map,
-            peaks: HashSet::new(),
+            trail_hashes: BTreeSet::new(),
         }
     }
 
     fn score(mut self, position: Position) -> HikingScore {
-        self.traverse(position);
-        self.peaks.len()
+        self.traverse(DefaultHasher::new(), position);
+        self.trail_hashes.len()
     }
 
-    fn traverse(&mut self, position: Position) {
+    fn traverse(&mut self, mut hasher: DefaultHasher, position: Position) {
+        position.hash(&mut hasher);
+
         let height = self.map.height(&position);
 
         if height == MAX_HEIGHT {
-            self.peaks.insert(position);
+            self.trail_hashes.insert(hasher.finish());
             return;
         }
 
@@ -85,7 +91,7 @@ impl<'a> HikeRouteScorer<'a> {
             .filter(|position| {
                 self.map.is_within_bounds(&position) && self.map.height(position) == height + 1
             })
-            .for_each(|next_position| self.traverse(next_position));
+            .for_each(|next_position| self.traverse(hasher.clone(), next_position));
     }
 }
 
@@ -133,11 +139,15 @@ impl ProblemSolver<Input, Output> for Solver {
         (0..map.y_len)
             .flat_map(|y| (0..map.x_len).map(move |x| Position { x, y }))
             .filter(|position| map.height(position) == MIN_HEIGHT)
-            .map(|hike_start_pos| HikeRouteScorer::new(&map).score(hike_start_pos))
+            .map(|hike_start_pos| HikeTrailScorer::new(&map).score(hike_start_pos))
             .sum()
     }
 }
 
 fn main() {
-    Runner::new(Parser, Solver).run(&vec!["src/10/input_1.txt", "src/10/input_2.txt", "src/10/input_3.txt"]);
+    Runner::new(Parser, Solver).run(&vec![
+        "src/10/input_1.txt",
+        "src/10/input_2.txt",
+        "src/10/input_3.txt",
+    ]);
 }

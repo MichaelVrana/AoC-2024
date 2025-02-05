@@ -10,9 +10,18 @@ struct Vector {
     y: i8,
 }
 
-const UP: Vector = Vector { x: 0, y: 1 };
+impl Vector {
+    fn reverse(&self) -> Vector {
+        Vector {
+            x: -self.x,
+            y: -self.y,
+        }
+    }
+}
+
+const UP: Vector = Vector { x: 0, y: -1 };
 const RIGHT: Vector = Vector { x: 1, y: 0 };
-const DOWN: Vector = Vector { x: 0, y: -1 };
+const DOWN: Vector = Vector { x: 0, y: 1 };
 const LEFT: Vector = Vector { x: -1, y: 0 };
 
 const POSSIBLE_DIRECTIONS: [Vector; 4] = [UP, RIGHT, DOWN, LEFT];
@@ -80,29 +89,33 @@ impl InputParser<Input> for Parser {
 type Price = u64;
 
 type Area = u32;
-type Perimiter = u32;
 
-#[derive(Clone, Copy)]
-struct Region {
-    area: Area,
-    perimeter: Perimiter,
+#[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+struct Border {
+    in_region: Position,
+    out_of_region: Position,
 }
 
-impl Region {
-    fn price(&self) -> Price {
-        self.perimeter as Price * self.area as Price
+impl Border {
+    fn border_dir(&self) -> Vector {
+        if self.in_region.x == self.out_of_region.x {
+            RIGHT
+        } else {
+            DOWN
+        }
     }
 
-    fn merge_part(&self, other: &Region) -> Region {
-        Region {
-            area: self.area + other.area,
-            perimeter: self.perimeter + other.perimeter,
+    fn move_by(&self, dir: Vector) -> Border {
+        Border {
+            in_region: self.in_region.move_by(dir),
+            out_of_region: self.out_of_region.move_by(dir),
         }
     }
 }
 
 struct RegionFinder<'a> {
     visited: HashSet<Position>,
+    borders: HashSet<Border>,
     map: &'a Map,
 }
 
@@ -110,7 +123,8 @@ impl<'a> RegionFinder<'a> {
     fn new(map: &'a Map) -> Self {
         RegionFinder {
             map,
-            visited: HashSet::<Position>::new(),
+            borders: HashSet::new(),
+            visited: HashSet::new(),
         }
     }
 
@@ -121,40 +135,72 @@ impl<'a> RegionFinder<'a> {
 
         let plant_type = self.map.get_plant_type(&position);
 
-        self.find_region(plant_type, position).price()
+        let area = self.find_region(plant_type, position);
+        let side_count = self.count_sides(plant_type);
+
+        area as Price * side_count as Price
     }
 
-    fn find_region(&mut self, plant_type: PlantType, position: Position) -> Region {
+    fn find_region(&mut self, plant_type: PlantType, position: Position) -> Area {
         if self.visited.contains(&position) {
-            return Region {
-                area: 0,
-                perimeter: 0,
-            };
+            return 0;
         }
 
         self.visited.insert(position.clone());
 
         let neighboring_positions = POSSIBLE_DIRECTIONS.iter().map(|dir| position.move_by(*dir));
 
-        let perimeter = neighboring_positions
+        neighboring_positions
             .clone()
             .filter(|neighboring_position| {
                 !self.map.is_within_bounds(neighboring_position)
                     || self.map.get_plant_type(&neighboring_position) != plant_type
             })
-            .count() as Perimiter;
+            .for_each(|position_over_border| {
+                self.borders.insert(Border {
+                    in_region: position.clone(),
+                    out_of_region: position_over_border,
+                });
+            });
 
-        let region_part = Region { area: 1, perimeter };
-
-        neighboring_positions
+        1 + neighboring_positions
             .filter(|neighboring_position| {
                 self.map.is_within_bounds(&neighboring_position)
                     && self.map.get_plant_type(&neighboring_position) == plant_type
             })
             .map(|neighboring_position| self.find_region(plant_type, neighboring_position))
-            .fold(region_part, |region, region_part| {
-                region.merge_part(&region_part)
-            })
+            .sum::<Area>()
+    }
+
+    fn remove_borders_in_dir(&mut self, plant_type: PlantType, mut border: Border, dir: Vector) {
+        loop {
+            self.borders.remove(&border);
+
+            border = border.move_by(dir);
+
+            if !self.map.is_within_bounds(&border.in_region)
+                || self.map.get_plant_type(&border.in_region) != plant_type
+                || (self.map.is_within_bounds(&border.out_of_region)
+                    && self.map.get_plant_type(&border.out_of_region) == plant_type)
+            {
+                break;
+            }
+        }
+    }
+
+    fn count_sides(&mut self, plant_type: PlantType) -> u32 {
+        let mut sides = 0;
+
+        while let Some(border) = self.borders.iter().cloned().next() {
+            sides += 1;
+
+            let dir = border.border_dir();
+
+            self.remove_borders_in_dir(plant_type, border.clone(), dir);
+            self.remove_borders_in_dir(plant_type, border, dir.reverse());
+        }
+
+        sides
     }
 }
 
@@ -179,5 +225,6 @@ fn main() {
         "src/12/input_2.txt",
         "src/12/input_3.txt",
         "src/12/input_4.txt",
+        "src/12/input_5.txt",
     ]);
 }
